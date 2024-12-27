@@ -29,7 +29,7 @@ stepRate = 1
 initialWorld :: World
 initialWorld = NewWorld
     {resolution :: (640, 480) 
-    ,comite 
+    ,comite test
     }
 
 

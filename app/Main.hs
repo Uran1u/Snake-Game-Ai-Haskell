@@ -59,7 +59,7 @@ size world =
 
 
 stepRate :: Int
-stepRate = 2
+stepRate = 5
 
 
 initialWorld :: Int -> World
@@ -67,7 +67,7 @@ initialWorld seed = NewWorld
     {resolution = (512, 512)
     ,direction = North
     ,scale1 = 10
-    ,snake = [(0, 2), (0, 1), (0, 0), (0, -1), (0, -2)]
+    ,snake = [(0, 2), (0, 1), (0, 0)]
     ,gameover = False
     ,gen = R.mkStdGen seed
     ,apple = (5, -3)
@@ -122,8 +122,12 @@ moveFood world =
 
 drawGameOver :: World -> Picture
 drawGameOver world = if gameover world
-    then let textpicture = color red (scale 0.4 0.4 (text "GameOver!"))
-        in translate (-120) 0 textpicture
+    then pictures 
+        [
+        (translate (-120) 0 (color red (scale 0.4 0.4 (text "GameOver!"))))
+        , color white (translate (-50) (-20) (scale 0.2 0.2 (text ("score :"++ show ((length (snake world))-3)))))
+        
+        ]
     else blank
 
     

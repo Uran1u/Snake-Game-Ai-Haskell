@@ -3,6 +3,9 @@ module Main where
 import Graphics.Gloss.Interface.Pure.Game
 import Graphics.Gloss
 import qualified System.Random as R
+import Debug.Trace (trace)
+import Data.List (minimumBy)
+import Data.Function (on)
 
 main :: IO ()
 main = do
@@ -33,9 +36,12 @@ drawWorld world = pictures
     , drawApples world
     ]
 drawSnake :: World -> Picture
-drawSnake world = pictures (map (\ p-> color green (drawbox p world)) (snake world))
-
-
+drawSnake world = case snake world of
+    (p : ps) -> pictures
+        ( color orange (drawbox p world)
+        : map (\ x -> color green (drawbox x world)) ps
+        )
+    _ -> blank
 
 drawbox :: (Int, Int) -> World -> Picture 
 drawbox (x, y) world = 
@@ -70,7 +76,7 @@ initialWorld seed = NewWorld
     ,snake = [(0, 2), (0, 1), (0, 0)]
     ,gameover = False
     ,gen = R.mkStdGen seed
-    ,apple = (5, -3)
+    ,apple = (0, 3)
     }
 
 
@@ -80,35 +86,43 @@ initialWorld seed = NewWorld
 handleEvent :: Event -> World -> World
 handleEvent event world = case event of 
     EventResize newResolution -> handleResize newResolution world
-    EventKey key state _ _ -> if gameover world 
+    _ ->
+        if gameover world 
         then world
-        else handleKey key state world 
+        else handleAi world
         
     _ -> world
 
-
-handleResize :: (Int, Int) -> World -> World 
-handleResize newResplution world = world {resolution = newResplution}
+handleAi :: World -> World
+handleAi world =
+    let aiDir = aiMove world
+    in trace ("AI Direction: " ++ show aiDir) world { direction = aiDir }
 
 handleStep :: Float -> World -> World
 handleStep _time world =
     if gameover world
     then world
     else
-        let oldSnake = snake world
-            newSnake@((x, y) : _) = init oldSnake
-            (x', y') = case direction world of
-                North -> (x, y + 1)
-                East -> (x + 1, y)
-                South -> (x, y - 1)
-                West -> (x - 1, y)
-        in  if inBounds world (x', y') && not (valsnake world (x', y'))
-            then if valfood world (x', y')
-                 then 
-                        let world' = moveFood world
-                        in world' {snake = (x', y'): oldSnake }
-                 else world { snake = (x', y') : newSnake }
-            else world { gameover = True }
+        let aiWorld = handleAi world  -- AI decides the next move
+        in -- Move the snake based on the updated direction
+           let oldSnake = snake aiWorld
+               newSnake@((x, y) : _) = init oldSnake
+               (x', y') = case direction aiWorld of
+                   North -> (x, y + 1)
+                   East  -> (x + 1, y)
+                   South -> (x, y - 1)
+                   West  -> (x - 1, y)
+           in if inBounds aiWorld (x', y') && not (valsnake aiWorld (x', y'))
+              then if valfood aiWorld (x', y')
+                   then let world' = moveFood aiWorld
+                        in world' { snake = (x', y') : oldSnake }
+                   else aiWorld { snake = (x', y') : newSnake }
+              else aiWorld { gameover = True }
+
+handleResize :: (Int, Int) -> World -> World 
+handleResize newResplution world = world {resolution = newResplution}
+
+
 
 moveFood :: World -> World 
 moveFood world = 
@@ -141,6 +155,33 @@ valsnake world (x, y) = any ( == (x, y)) (snake world)
 
 valfood :: World -> (Int, Int) -> Bool 
 valfood world (x, y) = (x, y) == apple world
+
+--Ai movements 
+aiMove :: World -> Direction
+aiMove world =
+    let (sx, sy) = head (snake world)  -- Snake's current head position
+        (fx, fy) = apple world         -- Food position
+        body = tail ( snake world)
+        isValid (x, y) = inBounds world (x, y) && notElem (x, y) body
+
+
+        possibleMoves = [(North,(sx, sy + 1 )),
+                         (East, (sx + 1, sy )),
+                         (South,(sx ,sy - 1 )),
+                         (West, (sx -1, sy ))]
+
+
+        validMoves = filter (isValid . snd) possibleMoves
+        --fbestmove
+        bestMove = if null validMoves
+                     then (direction world) -- Normal 
+                     else fst $ minimumBy ( compare `on` distaciaDaApple . snd ) validMoves
+        --calcula distancia 
+        distaciaDaApple (x, y) = abs ( fx -x) + abs (fy - y) 
+
+
+    in bestMove
+    
 
 handleKey :: Key -> KeyState -> World -> World
 handleKey key Down world = case key of

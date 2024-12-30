@@ -65,7 +65,7 @@ size world =
 
 
 stepRate :: Int
-stepRate = 5
+stepRate = 20
 
 
 initialWorld :: Int -> World
@@ -77,6 +77,7 @@ initialWorld seed = NewWorld
     ,gameover = False
     ,gen = R.mkStdGen seed
     ,apple = (0, 3)
+    ,restart = False
     }
 
 
@@ -88,12 +89,18 @@ handleEvent event world = case event of
     EventResize newResolution -> handleResize newResolution world
     _ ->
         if gameover world 
-        then world
+        then let newSeed = fst (R.next (gen world))  -- Generate a new seed from the current generator
+                 newWorld = initialWorld newSeed  -- Create a new world using the new seed
+             in  newWorld
+            
         else handleAi world
         
     _ -> world
 
-handleAi :: World -> World
+newSeed :: IO Int
+newSeed = R.randomIO
+
+handleAi :: World -> World 
 handleAi world =
     let aiDir = aiMove world
     in trace ("AI Direction: " ++ show aiDir) world { direction = aiDir }
@@ -182,15 +189,18 @@ aiMove world =
 
     in bestMove
     
-
+-- if you want to control the snake you can  just need to change the handle event and change to the "aiWorld"
 handleKey :: Key -> KeyState -> World -> World
 handleKey key Down world = case key of
     Char 'w' -> world { direction = if direction world == South then South else North}
     Char 's' -> world { direction = if direction world == North then North else South}
     Char 'd' -> world { direction = if direction world == West then West else East }
     Char 'a' -> world { direction = if direction world == East then East else West }
-    _ -> world
+    Char 'r' -> world { restart = if restart world == False then True else False }
 handleKey _ _ world = world
+
+generateNewSeed :: IO Int
+generateNewSeed = R.randomIO
 
 --
 data World = NewWorld
@@ -199,8 +209,9 @@ data World = NewWorld
     ,scale1 :: Int
     ,snake :: [(Int, Int)]
     ,gameover :: Bool
-    , gen :: R.StdGen
+    ,gen :: R.StdGen
     ,apple :: (Int , Int)
+    ,restart :: Bool
     } deriving ( Show)
 
 
